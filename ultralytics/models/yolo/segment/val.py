@@ -103,7 +103,7 @@ class SegmentationValidator(DetectionValidator):
             preds[0][-1] if isinstance(preds[0], tuple) else preds[-1]
         )  # second output is len 3 if pt, but only 1 if exported
         preds = super().postprocess(preds[0])
-        imgsz = [4 * x for x in proto.shape[2:]]  # get image size from proto
+        imgsz = self.dataloader.dataset.batch_shapes[self.batch_i]  # get image size from dataloader
         for i, pred in enumerate(preds):
             coefficient = pred.pop("extra")
             pred["masks"] = (
@@ -136,7 +136,10 @@ class SegmentationValidator(DetectionValidator):
         else:
             masks = batch["masks"][batch["batch_idx"] == si]
         if nl:
-            mask_size = [s if self.process is ops.process_mask_native else s // 4 for s in prepared_batch["imgsz"]]
+            mask_size = [
+                s if self.process is ops.process_mask_native else s // int(self.stride[0] / 2)
+                for s in prepared_batch["imgsz"]
+            ]
             if masks.shape[1:] != mask_size:
                 masks = F.interpolate(masks[None], mask_size, mode="bilinear", align_corners=False)[0]
                 masks = masks.gt_(0.5)
